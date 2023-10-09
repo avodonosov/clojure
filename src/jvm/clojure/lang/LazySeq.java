@@ -22,6 +22,8 @@ private IFn fn;
 private Object sv;
 private ISeq s;
 
+private static final Object FN_IN_PROGRESS = new Object();
+
 public LazySeq(IFn fn){
 	this.fn = fn;
 }
@@ -38,28 +40,71 @@ public Obj withMeta(IPersistentMap meta){
 	return new LazySeq(meta, seq());
 }
 
-final synchronized Object sval(){
-	if(fn != null)
+final Object sval(){
+	synchronized (this)
 		{
-                sv = fn.invoke();
-                fn = null;
+		while (sv == FN_IN_PROGRESS)
+			{
+			try
+				{
+				wait();
+				}
+			catch (InterruptedException e)
+				{
+				throw new RuntimeException(
+						"LazySeq.sval() is interrupted while waiting for a parallel thread to compute the fn",					e);
+				}
+			}
+
+		if(fn != null)
+			{
+			sv = FN_IN_PROGRESS;
+			}
 		}
+
+	if (fn != null)
+		{
+		Object newSv = null;
+		IFn newFn = fn;
+		try
+			{
+			newSv = fn.invoke();
+			newFn = null;
+			}
+		finally
+			{
+			synchronized (this)
+				{
+				sv = newSv;
+				fn = newFn;
+				notifyAll();
+				}
+			}
+		}
+
 	if(sv != null)
 		return sv;
 	return s;
 }
 
-final synchronized public ISeq seq(){
+final public ISeq seq(){
 	sval();
 	if(sv != null)
 		{
 		Object ls = sv;
-		sv = null;
 		while(ls instanceof LazySeq)
 			{
 			ls = ((LazySeq)ls).sval();
 			}
-		s = RT.seq(ls);
+		ISeq newS = RT.seq(ls);
+		synchronized (this)
+			{
+			if (sv != null)
+				{
+				s = newS;
+				sv = null;
+				}
+			}
 		}
 	return s;
 }
