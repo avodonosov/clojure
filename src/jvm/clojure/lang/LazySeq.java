@@ -62,7 +62,7 @@ final Object sval(){
 			}
 		}
 
-	if (fn != null)
+	if (sv == FN_IN_PROGRESS)
 		{
 		Object newSv = null;
 		IFn newFn = fn;
