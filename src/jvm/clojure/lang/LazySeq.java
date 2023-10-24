@@ -91,18 +91,25 @@ final public ISeq seq(){
 	sval();
 	if(sv != null)
 		{
-		Object ls = sv;
-		while(ls instanceof LazySeq)
+		ISeq newS = s;
+		try
 			{
-			ls = ((LazySeq)ls).sval();
-			}
-		ISeq newS = RT.seq(ls);
-		synchronized (this)
-			{
-			if (sv != null)
+			Object ls = sv;
+			while(ls instanceof LazySeq)
 				{
-				s = newS;
-				sv = null;
+				ls = ((LazySeq)ls).sval();
+				}
+			newS = RT.seq(ls);
+			}
+		finally
+			{
+			synchronized (this)
+				{
+				if (sv != null)
+					{
+					s = newS;
+					sv = null;
+					}
 				}
 			}
 		}
